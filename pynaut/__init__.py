@@ -1,4 +1,5 @@
 import __builtin__
+import re
 
 class ObjectMetaData(object):
 
@@ -19,9 +20,6 @@ class ObjectMetaData(object):
 
 class Object(object):
 
-    def __new__(cls, obj):
-        instances = [i for i in :]
-
     def __init__(self, obj):
         assert obj is not self  # Avoid some very confusing situations.
         self.obj = obj
@@ -41,59 +39,65 @@ class Object(object):
     @property
     def children(self):
         children = {}
-        if self.in_ancestry:
-            return {}
-        if self.is_base_type:
-            return {}
-        try:
-            _dict = vars(self.obj)
-        except TypeError:
-            _dict = {}
-            for name in dir(self.obj):
-                _dict[name] = getattr(self.obj, name)
+
+        obj = self.get_from_ancestry()
+        if obj is not None:
+            return obj.children
+
+        _dict = {}
+        for name in dir(self.obj):
+            _dict[name] = getattr(self.obj, name, '<failed_to_get_value>')
+
         for attr, value in _dict.iteritems():
             child = Object(value)
             child.parent = self
             children[attr] = child
+
         return children
 
     @property
     def is_root(self):
         return self.parent == self
 
-    @property
-    def is_base_type(self):
-        return type(self.obj) in __builtin__.__dict__.values()
+    def get_from_ancestry(self):
+        try:
+            o, = [o for o in self.ancestry if o.obj is self.obj]
+            return o
+        except ValueError:
+            return None
 
-    @property
-    def in_ancestry(self):
-        return self.obj in [o.obj for o in self.ancestry]
 
     @property
     def ancestry(self):
-        ancestry = []
-        o = self.parent
-        while not o.is_root:
-            ancestry.insert(0, o)
-            o = o.parent
-        return ancestry
-
-    def grep_attr_names(self, expression):
-        obj = self
+        o = self
         while True:
-            if not obj.children:
+            if o.is_root:
                 break
-            for attr_name, value in obj.children.iteritems():
-                if expression in attr_name:
-                    #print '{0} = {1}'.format(attr_name, value.ancestry)
-                    yield attr_name, value.ancestry
-                obj = value
-                obj.grep_attr_names(expression)
+            else:
+                o = o.parent
+                yield o
 
-    #def __repr__(self):
-    #    return '<{0}({1}) >'.format(self.__class__.__name__, self.obj)
+    def get_attr_matches(self, test, accum=[], seen=[], depth=4):
+        if depth <= 0:
+            return accum
+        for name, value in self.children.iteritems():
+            if name.startswith('__'):
+                continue
+            if value in seen:
+                recurse = False
+            else:
+                recurse = True
+            seen.append(value)
+            if test(name, value):
+                accum.append((name, value))
+            if recurse:
+                value.get_attr_matches(test, accum=accum, seen=seen, depth=depth-1)
+        return accum
 
+    def grep_attr_names(self, reg):
+        reg = re.compile(reg)
+        test = lambda n, v: reg.search(n) is not None
+        return self.get_attr_matches(test)
 
-
-if __name__ == '__main__':
-    pass
+    def __repr__(self):
+        return '<{0}({1}) >'.format(self.__class__.__name__, repr(self.obj))
