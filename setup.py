@@ -1,43 +1,43 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from setuptools import setup
-from time import time
-import sys
-import os
 
-BUILDTIME_TEMPLATE = 'BUILDTIME'
+import direg
 
-requires=[]
+# README.rst dynamically generated:
+with open('README.rst', 'w') as f:
+    f.write(direg.__doc__)
 
-def make_buildtime_file():
-    with open(BUILDTIME_TEMPLATE, 'w') as f:
-        now = time()
-        f.write(str(now))
+NAME = 'pynaut'
 
-def get_version():
-    if not os.path.exists(BUILDTIME_TEMPLATE):
-        make_buildtime_file()
-    buildtime = open(BUILDTIME_TEMPLATE, 'r').read()
-    buildtime = float(buildtime)
-    version = '0.1.{0}'.format(int(buildtime/60.0))
-    return version
+def read(file):
+    with open(file, 'r') as f:
+        return f.read().strip()
 
-name='pynaut'
-
-setup(name=name,
-    version=get_version(),
-    description='A Python Object Explorer',
-    long_description=open('README.md', 'r').read(),
+setup(
+    name=NAME,
+    version=read('VERSION'),
+    description='A library/tool for recursively exploring arbitrary python objects.',
+    long_description='\n' + read('README.rst'),
     author='Mike Burr',
     author_email='mburr@unintuitive.org',
-    license='LGPL',
-    install_requires=requires,
-    requires=requires,
-    url='https://github.com/stnbu/pynaut',
-    classifiers=[],
-    packages=[
-        'pynaut',
+    url='https://github.com/stnbu/{0}'.format(NAME),
+    download_url='https://github.com/stnbu/{0}/archive/master.zip'.format(NAME),
+    provides=[NAME],
+    license='MIT',
+    bugtrack_url='https://github.com/stnbu/{0}/issues'.format(NAME),
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 2',
+        'Topic :: Software Development :: Debuggers',
+        'Topic :: Software Development :: Testing',
+        'Topic :: Software Development',
+        'Topic :: Utilities',
     ],
+    packages=[NAME],
+    keywords=['introspection', 'debugging'],
+    test_suite='nose.collector',
+    test_requires=['nose'],
 )
-
-
