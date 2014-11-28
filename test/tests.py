@@ -25,4 +25,4 @@ def test_testdata():
     assert 8 == len(obj.grep_attr_names('_$'))
     assert 170 == len(obj.grep_attr_names('^real$'))
     test = lambda n, v: n.lower().startswith('a')
-    assert 303 == len(obj.get_attr_matches(test))
+    assert 304 == len(obj.get_attr_matches(test))
