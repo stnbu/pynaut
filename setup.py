@@ -18,7 +18,7 @@ setup(
     name=NAME,
     version=read('VERSION'),
     description='A tool for recursively exploring arbitrary python objects.',
-    long_description='\n' + read('README.rst'),
+    long_description=read('README.rst'),
     author='Mike Burr',
     author_email='mburr@unintuitive.org',
     url='https://github.com/stnbu/{0}'.format(NAME),
