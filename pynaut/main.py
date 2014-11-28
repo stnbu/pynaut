@@ -33,7 +33,7 @@ class ObjectMetaData(object):
     def id(self):
         return id(self.obj)
 
-class Object(object):
+class Container(object):
 
     def __init__(self, obj, parent=None):
         assert obj is not self  # Avoid some very confusing situations.
@@ -66,7 +66,7 @@ class Object(object):
 
             child = GLOBAL_CACHE.get(id(value), None)
             if child is None:
-                child = Object(value, parent=self)
+                child = Container(value, parent=self)
                 GLOBAL_CACHE[id(value)] = child
 
             children[attr] = child
@@ -81,7 +81,7 @@ class Object(object):
         self._ancestry = []
         o = self
         while True:
-            if o.parent is None:  # o.parent == None means "root" Object
+            if o.parent is None:  # o.parent == None means "root" Container
                 break
             o = o.parent
             self._ancestry.append(o)

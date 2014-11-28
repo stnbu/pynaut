@@ -3,12 +3,12 @@ import sys
 import types
 import data
 import decimal
-from pynaut import Object
+from pynaut import Container
 
 def test_testdata():
     """Some fairly complex tests that are known to give a particular result with the test data.
     """
-    obj = Object(data)
+    obj = Container(data)
 
     x = obj.children['convoluted']
     x = x.children['decimal']
@@ -36,7 +36,7 @@ def test_testdata():
 
 
 def _test_repeated_search(obj, search_reg):
-    obj = Object(obj)
+    obj = Container(obj)
     one = list(obj.grep_attr_names(search_reg))
     two = list(obj.grep_attr_names(search_reg))
     assert len(one) == len(two)
