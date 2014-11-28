@@ -1,5 +1,19 @@
 import __builtin__
 import re
+import logging
+
+logger = logging.getLogger(__name__)
+
+DUMMY_VALUE = '<failed_to_get_value>'
+
+try:
+    profile
+except NameError:
+    def profile(fn):
+      def fn_wrap(*args, **kwargs):
+        return fn(*args, **kwargs)
+      return fn_wrap
+
 
 class ObjectMetaData(object):
 
@@ -20,25 +34,26 @@ class ObjectMetaData(object):
 
 class Object(object):
 
-    def __init__(self, obj):
+    def __init__(self, obj, parent=None):
         assert obj is not self  # Avoid some very confusing situations.
         self.obj = obj
         self._metadata = None
-        self.parent = self
-
-    def _make_items(self, _dict):
-        for attr, value in _dict.iteritems():
-            yield attr, Object(value)
+        self._children = None
+        self._ancestry = None
+        self.parent = parent
 
     @property
+    @profile
     def metadata(self):
         if self._metadata is None:
             self._metadata = ObjectMetaData(self.obj)
         return self._metadata
 
     @property
+    @profile
     def children(self):
-        children = {}
+        if self._children is not None:
+            return self._children
 
         obj = self.get_from_ancestry()
         if obj is not None:
@@ -46,40 +61,45 @@ class Object(object):
 
         _dict = {}
         for name in dir(self.obj):
-            _dict[name] = getattr(self.obj, name, '<failed_to_get_value>')
+            try:
+                _dict[name] = getattr(self.obj, name)
+            except AttributeError:
+                logger.warn('Having to return dummy value for attribute "{0}"'.format(name))
+                _dict[name] = DUMMY_VALUE
 
+        self._children = {}
         for attr, value in _dict.iteritems():
-            child = Object(value)
-            child.parent = self
-            children[attr] = child
+            child = Object(value, parent=self)
+            self._children[attr] = child
+        return self._children
 
-        return children
-
-    @property
-    def is_root(self):
-        return self.parent == self
-
+    @profile
     def get_from_ancestry(self):
-        try:
-            o, = [o for o in self.ancestry if o.obj is self.obj]
-            return o
-        except ValueError:
+        for inst in self.ancestry:
+            if inst.obj is self.obj:
+                return inst
+        else:
             return None
 
-
     @property
+    @profile
     def ancestry(self):
+        if self._ancestry is not None:
+            return self._ancestry
+        self._ancestry = []
         o = self
         while True:
-            if o.is_root:
+            if o.parent is None:  # o.parent == None means "root" Object
                 break
-            else:
-                o = o.parent
-                yield o
+            o = o.parent
+            self._ancestry.append(o)
 
-    def get_attr_matches(self, test, accum=[], seen=[], depth=4):
+        return self._ancestry
+
+    @profile
+    def get_attr_matches(self, test, seen=set(), depth=4):
         if depth <= 0:
-            return accum
+            return
         for name, value in self.children.iteritems():
             if name.startswith('__'):
                 continue
@@ -87,17 +107,19 @@ class Object(object):
                 recurse = False
             else:
                 recurse = True
-            seen.append(value)
+                seen.add(value)
             if test(name, value):
-                accum.append((name, value))
+                yield name, value
             if recurse:
-                value.get_attr_matches(test, accum=accum, seen=seen, depth=depth-1)
-        return accum
+                for pair in value.get_attr_matches(test, seen=seen, depth=depth-1):
+                    yield pair
 
+    @profile
     def grep_attr_names(self, reg):
         reg = re.compile(reg)
         test = lambda n, v: reg.search(n) is not None
         return self.get_attr_matches(test)
 
+    @profile
     def __repr__(self):
         return '<{0}({1}) >'.format(self.__class__.__name__, repr(self.obj))
