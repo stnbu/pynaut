@@ -61,7 +61,7 @@ class Container(object):
                 logger.warn('Having to return dummy value for attribute "{0}" (error: {1})'.format(name, str(e)))
                 _dict[name] = DUMMY_VALUE
 
-        children = {}
+        children = []
         for attr, value in _dict.iteritems():
 
             child = GLOBAL_CACHE.get(id(value), None)
@@ -69,8 +69,8 @@ class Container(object):
                 child = Container(value, parent=self)
                 GLOBAL_CACHE[id(value)] = child
 
-            children[attr] = child
-            children[attr].metadata.name = attr
+            child.metadata.name = attr
+            children.append(child)
         return children
 
     @property
@@ -95,23 +95,23 @@ class Container(object):
         if not recursing:
             seen = set()
             depth = 4
-        for name, value in self.children.iteritems():
-            if name.startswith('__'):
+        for container in self.children:
+            if container.metadata.name.startswith('__'):
                 continue
-            if value in seen:
+            if container in seen:
                 recurse = False
             else:
                 recurse = True
-                seen.add(value)
-                if test(name, value):
-                    yield name, value
-                for pair in value.get_attr_matches(test, seen=seen, depth=depth-1, recursing=True):
-                    yield pair
+                seen.add(container)
+                if test(container):
+                    yield container
+                for c in container.get_attr_matches(test, seen=seen, depth=depth-1, recursing=True):
+                    yield c
 
     @profile
     def grep_attr_names(self, reg, depth=4):
         reg = re.compile(reg)
-        test = lambda n, v: reg.search(n) is not None
+        test = lambda c: reg.search(c.metadata.name) is not None
         return self.get_attr_matches(test, depth=depth)
 
     @profile

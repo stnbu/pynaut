@@ -10,19 +10,7 @@ def test_testdata():
     """
     obj = Container(data)
 
-    x = obj.children['convoluted']
-    x = x.children['decimal']
-    x = x.children['real']
-    x = x.children['real']
-    x = x.children['rotate']
-    x = x.children['im_class']
-    ancestry = list(x.ancestry)
-    _objects = [o.obj for o in ancestry]
-    _types = [decimal.Decimal, data.Convoluted, types.ModuleType]
-    for _object, _type in zip(_objects, _types):
-        assert isinstance(_object, _type)
-
-    test = lambda n, v: n.lower().startswith('a')
+    test = lambda c: c.metadata.name.lower().startswith('a')
 
     results = [
     len(list(obj.grep_attr_names('^S'))),
@@ -30,7 +18,7 @@ def test_testdata():
     len(list(obj.grep_attr_names('^real$'))),
     len(list(obj.get_attr_matches(test))),
     ]
-    expected = [3, 4, 3, 89]
+    expected = [3, 4, 3, 88]
 
     assert expected == results
 
@@ -40,7 +28,7 @@ def _test_repeated_search(obj, search_reg):
     one = list(obj.grep_attr_names(search_reg))
     two = list(obj.grep_attr_names(search_reg))
     assert len(one) == len(two)
-    test = lambda n, v: isinstance(v.obj, (int, str, float, Exception, types.FunctionType))
+    test = lambda c: isinstance(c.obj, (int, str, float, Exception, types.FunctionType))
     one = list(obj.get_attr_matches(test, depth=5))
     two = list(obj.get_attr_matches(test, depth=5))
     assert len(one) == len(two)
