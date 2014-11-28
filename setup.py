@@ -2,11 +2,11 @@
 
 from setuptools import setup
 
-import direg
+import pynaut
 
 # README.rst dynamically generated:
 with open('README.rst', 'w') as f:
-    f.write(direg.__doc__)
+    f.write(pynaut.__doc__)
 
 NAME = 'pynaut'
 
@@ -17,7 +17,7 @@ def read(file):
 setup(
     name=NAME,
     version=read('VERSION'),
-    description='A library/tool for recursively exploring arbitrary python objects.',
+    description='A tool for recursively exploring arbitrary python objects.',
     long_description='\n' + read('README.rst'),
     author='Mike Burr',
     author_email='mburr@unintuitive.org',
