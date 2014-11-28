@@ -5,6 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 DUMMY_VALUE = '<failed_to_get_value>'
+GLOBAL_CACHE = {}
 
 try:
     profile
@@ -14,11 +15,11 @@ except NameError:
         return fn(*args, **kwargs)
       return fn_wrap
 
-
 class ObjectMetaData(object):
 
     def __init__(self, obj):
         self.obj = obj
+        self.name = None
 
     @property
     def hashable(self):
@@ -38,7 +39,6 @@ class Object(object):
         assert obj is not self  # Avoid some very confusing situations.
         self.obj = obj
         self._metadata = None
-        self._children = None
         self._ancestry = None
         self.parent = parent
 
@@ -52,34 +52,26 @@ class Object(object):
     @property
     @profile
     def children(self):
-        if self._children is not None:
-            return self._children
-
-        obj = self.get_from_ancestry()
-        if obj is not None:
-            return obj.children
-
+        global GLOBAL_CACHE
         _dict = {}
         for name in dir(self.obj):
             try:
                 _dict[name] = getattr(self.obj, name)
-            except AttributeError:
-                logger.warn('Having to return dummy value for attribute "{0}"'.format(name))
+            except Exception as e:
+                logger.warn('Having to return dummy value for attribute "{0}" (error: {1})'.format(name, str(e)))
                 _dict[name] = DUMMY_VALUE
 
-        self._children = {}
+        children = {}
         for attr, value in _dict.iteritems():
-            child = Object(value, parent=self)
-            self._children[attr] = child
-        return self._children
 
-    @profile
-    def get_from_ancestry(self):
-        for inst in self.ancestry:
-            if inst.obj is self.obj:
-                return inst
-        else:
-            return None
+            child = GLOBAL_CACHE.get(id(value), None)
+            if child is None:
+                child = Object(value, parent=self)
+                GLOBAL_CACHE[id(value)] = child
+
+            children[attr] = child
+            children[attr].metadata.name = attr
+        return children
 
     @property
     @profile
@@ -97,9 +89,12 @@ class Object(object):
         return self._ancestry
 
     @profile
-    def get_attr_matches(self, test, seen=set(), depth=4):
+    def get_attr_matches(self, test, seen=set(), depth=4, recursing=False):
         if depth <= 0:
             return
+        if not recursing:
+            seen = set()
+            depth = 4
         for name, value in self.children.iteritems():
             if name.startswith('__'):
                 continue
@@ -108,17 +103,16 @@ class Object(object):
             else:
                 recurse = True
                 seen.add(value)
-            if test(name, value):
-                yield name, value
-            if recurse:
-                for pair in value.get_attr_matches(test, seen=seen, depth=depth-1):
+                if test(name, value):
+                    yield name, value
+                for pair in value.get_attr_matches(test, seen=seen, depth=depth-1, recursing=True):
                     yield pair
 
     @profile
-    def grep_attr_names(self, reg):
+    def grep_attr_names(self, reg, depth=4):
         reg = re.compile(reg)
         test = lambda n, v: reg.search(n) is not None
-        return self.get_attr_matches(test)
+        return self.get_attr_matches(test, depth=depth)
 
     @profile
     def __repr__(self):
