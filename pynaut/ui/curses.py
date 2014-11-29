@@ -145,7 +145,6 @@ class PynautTreeBrowser:
         ('key', 'END'), '  ',
         ('key', 'Q'),
         ]
-    header_text = (u"UP / DOWN / PAGE UP / PAGE DOWN scroll.  Q exits.")
 
 
     def __init__(self, data=None):
@@ -165,7 +164,11 @@ class PynautTreeBrowser:
              ])
         self.columns.set_focus_column(0)
 
-        header = urwid.AttrWrap(urwid.Text(self.header_text), 'head')
+        header_left = urwid.Text('this is the left header column')
+        header_center = urwid.Text('this is the center header column')
+        header_right = urwid.Text('this is the left header column')
+        header = urwid.AttrWrap(urwid.Columns([header_left, header_center, header_right]), 'head')
+
         footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
         self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
 
