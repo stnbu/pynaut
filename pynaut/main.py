@@ -154,13 +154,9 @@ class Container(object):
     def get_attr_matches(self, test, seen=set(), depth=4, recursing=False, include_dunder=False):
         if depth <= 0:
             return
-        if depth == 1:
-            for child in self.children:
-                yield child
-            return
-        #if not recursing:
-        #    seen = set()
-        #    depth = 4
+        if not recursing:  # FIXME
+            seen = set()
+            depth = 4
         for container in self.children:
             if container.metadata.name.startswith('__') and not include_dunder:
                 continue
