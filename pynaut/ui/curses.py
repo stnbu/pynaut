@@ -81,6 +81,24 @@ class ContainerNode(urwid.ParentNode):
                           key=key,
                           depth=self.get_depth()+1)
 
+def get_container_list_box(container_instance=None):
+
+    if container_instance is not None:
+        body = [urwid.Text('--- [' + container_instance.metadata.name + '] ---'), urwid.Divider()]
+        metadata = [
+            ('id()', container_instance.metadata.id),
+            ('type', container_instance.metadata.type),
+        ]
+    else:
+        body = [urwid.Text(''), urwid.Divider()]
+        metadata = []
+
+    for name, value in metadata:
+        text = urwid.Text('{0}:   {1}'.format(name, value))
+        body.append(urwid.AttrMap(text, None, focus_map='reversed'))
+
+    return urwid.ListBox(urwid.SimpleFocusListWalker(body))
+
 class ContainerTreeListBox(urwid.TreeListBox):
 
     def keypress(self, size, key):
@@ -95,21 +113,9 @@ class ContainerTreeListBox(urwid.TreeListBox):
         if self._container_detail_listbox is None:
             logger.warn('_container_detail_listbox still not updated.')
             return
-
-        container = node.container_object
-
-        body = [urwid.Text('--- [' + container.metadata.name + '] ---'), urwid.Divider()]
-        metadata = [
-            ('id()', container.metadata.id),
-            ('type', container.metadata.type),
-        ]
-        for name, value in metadata:
-            text = urwid.Text('{0}:   {1}'.format(name, value))
-            body.append(urwid.AttrMap(text, None, focus_map='reversed'))
-        self._container_detail_listbox.original_widget = urwid.ListBox(urwid.SimpleFocusListWalker(body))
-
-    def __getattribute__(self, name):
-        return urwid.TreeListBox.__getattribute__(self, name)
+        container_instance = node.container_object
+        list_box = get_container_list_box(container_instance)
+        self._container_detail_listbox.original_widget = list_box
 
     def change_focus(self, *args, **kwargs):
         node = args[1]
@@ -119,14 +125,19 @@ class ContainerTreeListBox(urwid.TreeListBox):
 class PynautTreeBrowser:
     palette = [
         ('body', 'black', 'light gray'),
+        ('flagged', 'black', 'dark green', ('bold','underline')),
         ('focus', 'light gray', 'dark blue', 'standout'),
+        ('flagged focus', 'yellow', 'dark cyan',
+                ('bold','standout','underline')),
         ('head', 'yellow', 'black', 'standout'),
         ('foot', 'light gray', 'black'),
         ('key', 'light cyan', 'black','underline'),
         ('title', 'white', 'black', 'bold'),
+        ('dirmark', 'black', 'dark cyan', 'bold'),
         ('flag', 'dark gray', 'light gray'),
         ('error', 'dark red', 'light gray'),
         ]
+
     footer_text = [
         ('title', 'Pynaut Data Browser'), '    ',
         ('key', 'UP'), ',', ('key', 'DOWN'), ',',
@@ -142,31 +153,20 @@ class PynautTreeBrowser:
 
     def __init__(self, data=None):
 
-        rh_menu_title = u'Pynaut Python Object Browser'
-        rh_menu_items = []
-
         self.topnode = ContainerNode(data)
-        self.listbox = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
-        self.listbox.offset_rows = 1
+        self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
 
-        container_detail_listbox = self.get_container_detail(rh_menu_title, rh_menu_items)
-        self.infobox = urwid.Padding(container_detail_listbox, left=20, right=20)
-        self.listbox._container_detail_listbox = self.infobox
+        self.container_detail_listbox = get_container_list_box()
 
-        self.columns = urwid.Columns([self.listbox, self.infobox])
+        self.infobox = urwid.Padding(self.container_detail_listbox, left=20, right=20)
+        self.container_tree_list_box._container_detail_listbox = self.infobox
+
+        self.columns = urwid.Columns([self.container_tree_list_box, self.infobox])
 
         self.columns.set_focus_column(0)
 
         view = urwid.AttrWrap(self.columns, 'body')
         self.view = urwid.Frame(view) # for showing messages
-
-
-    def get_container_detail(self, title, items):
-        body = [urwid.Text(title), urwid.Divider()]
-        for c in items:
-            button = urwid.Button(c)
-            body.append(urwid.AttrMap(button, None, focus_map='reversed'))
-        return urwid.ListBox(urwid.SimpleFocusListWalker(body))
 
     def main(self):
         global loop
