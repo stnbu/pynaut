@@ -93,6 +93,8 @@ class ObjectMetaData(object):
 
 class Container(object):
 
+    filters = []
+
     def __init__(self, obj, parent=None):
         assert obj is not self  # Avoid some very confusing situations.
         self.obj = obj
@@ -103,6 +105,10 @@ class Container(object):
     @property
     def container_cache_size(self):
         return len(GLOBAL_CACHE)
+
+    @property
+    def root_container(self):
+        return self.ancestry[-1]
 
     @property
     @profile
@@ -133,6 +139,9 @@ class Container(object):
 
             child.metadata.name = attr
             children.append(child)
+        if self.filters:
+            for filt in self.filters:
+                children = [c for c in children if filt(c)]
         return children
 
     @property
@@ -143,10 +152,10 @@ class Container(object):
         self._ancestry = ContainerCollection()
         o = self
         while True:
+            self._ancestry.append(o)
             if o.parent is None:  # o.parent == None means "root" Container
                 break
             o = o.parent
-            self._ancestry.append(o)
 
         return self._ancestry
 
