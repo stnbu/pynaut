@@ -101,19 +101,14 @@ def get_container_list_box(container_instance=None):
 
 class ContainerTreeListBox(urwid.TreeListBox):
 
-    _container_detail_listbox = None
-
-    def update_container_detail_listbox(self, node):
-        if self._container_detail_listbox is None:
-            logger.warn('_container_detail_listbox still not updated.')
-            return
-        container_instance = node.container_object
-        list_box = get_container_list_box(container_instance)
-        self._container_detail_listbox.original_widget = list_box
+    on_listbox_node_change = None
 
     def change_focus(self, *args, **kwargs):
         node = args[1]
-        self.update_container_detail_listbox(node)
+        if self.on_listbox_node_change is None:
+            logger.warn('on_listbox_node_change attribute still not set.')
+        else:
+            self.on_listbox_node_change(node)
         return urwid.TreeListBox.change_focus(self, *args, **kwargs)
 
 class PynautTreeBrowser:
@@ -155,7 +150,8 @@ class PynautTreeBrowser:
         self.topnode = ContainerNode(data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
         self.container_detail_box = pad(get_container_list_box())
-        self.container_tree_list_box._container_detail_listbox = self.container_detail_box
+
+        self.container_tree_list_box.on_listbox_node_change = self.on_listbox_node_change
 
         self.columns = urwid.Columns(
             [
@@ -164,10 +160,11 @@ class PynautTreeBrowser:
              ])
         self.columns.set_focus_column(0)
 
-        header_left = urwid.Text('this is the left header column')
-        header_center = urwid.Text('this is the center header column')
-        header_right = urwid.Text('this is the left header column')
-        header = urwid.AttrWrap(urwid.Columns([header_left, header_center, header_right]), 'head')
+        self.header_left = urwid.Text('this is the left header column')
+        self.header_center = urwid.Text('this is the center header column')
+        self.header_right = urwid.Text('this is the left header column')
+
+        header = urwid.AttrWrap(urwid.Columns([self.header_left, self.header_center, self.header_right]), 'head')
 
         footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
         self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
@@ -182,6 +179,13 @@ class PynautTreeBrowser:
         if k in ('q','Q'):
             raise urwid.ExitMainLoop()
 
+    def on_listbox_node_change(self, *args, **kwargs):
+        node = args[0]
+        container_instance = node.container_object
+        list_box = get_container_list_box(container_instance)
+        self.container_detail_box.original_widget = list_box
+        attr_name = u' ##### [ {0} ] ##### '.format(container_instance.metadata.name)
+        self.header_center.set_text(attr_name)
 
 def main(python_object=None):
     if python_object is None:
