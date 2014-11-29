@@ -40,4 +40,9 @@ setup(
     keywords=['introspection', 'debugging'],
     test_suite='nose.collector',
     test_requires=['nose'],
+    entry_points={
+        'console_scripts': [
+            'pynaut_curses = pynaut.ui.curses:main',
+        ],
+        'gui_script': []},
 )
