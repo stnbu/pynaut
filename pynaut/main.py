@@ -92,6 +92,10 @@ class Container(object):
         self.parent = parent
 
     @property
+    def container_cache_size(self):
+        return len(GLOBAL_CACHE)
+
+    @property
     @profile
     def metadata(self):
         if self._metadata is None:
