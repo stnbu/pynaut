@@ -84,7 +84,7 @@ class ContainerNode(urwid.ParentNode):
 def get_container_list_box(container_instance=None):
 
     if container_instance is not None:
-        body = [urwid.Text('--- [' + container_instance.metadata.name + '] ---'), urwid.Divider()]
+        body = [urwid.Text('--- [' + str(container_instance.metadata.name) + '] ---'), urwid.Divider()]
         metadata = [
             ('id()', container_instance.metadata.id),
             ('type', container_instance.metadata.type),
@@ -100,12 +100,6 @@ def get_container_list_box(container_instance=None):
     return urwid.ListBox(urwid.SimpleFocusListWalker(body))
 
 class ContainerTreeListBox(urwid.TreeListBox):
-
-    def keypress(self, size, key):
-        if key == 'right':
-            return key
-        key = self.__super.keypress(size, key)
-        return self.unhandled_input(size, key)
 
     _container_detail_listbox = None
 
@@ -124,6 +118,7 @@ class ContainerTreeListBox(urwid.TreeListBox):
 
 class PynautTreeBrowser:
     palette = [
+        (None, 'dark red', 'light gray'),  # Make it visible
         ('body', 'black', 'light gray'),
         ('flagged', 'black', 'dark green', ('bold','underline')),
         ('focus', 'light gray', 'dark blue', 'standout'),
@@ -150,12 +145,17 @@ class PynautTreeBrowser:
         ('key', 'END'), '  ',
         ('key', 'Q'),
         ]
+    header_text = (u"UP / DOWN / PAGE UP / PAGE DOWN scroll.  Q exits.")
+
 
     def __init__(self, data=None):
 
+        def pad(w):
+            return urwid.Padding(w, left=20, right=20)
+
         self.topnode = ContainerNode(data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
-        self.container_detail_box = urwid.Padding(get_container_list_box(), left=20, right=20)
+        self.container_detail_box = pad(get_container_list_box())
         self.container_tree_list_box._container_detail_listbox = self.container_detail_box
 
         self.columns = urwid.Columns(
@@ -165,7 +165,12 @@ class PynautTreeBrowser:
              ])
         self.columns.set_focus_column(0)
 
-        self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'))
+
+
+
+        header = urwid.AttrWrap(urwid.Text(self.header_text), 'head')
+        footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
+        self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
 
     def main(self):
         global loop
