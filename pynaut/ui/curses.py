@@ -160,13 +160,10 @@ class PynautTreeBrowser:
 
         self.columns = urwid.Columns(
             [
-                self.container_tree_list_box,
-                self.container_detail_box
+                urwid.LineBox(self.container_tree_list_box),
+                urwid.LineBox(self.container_detail_box)
              ])
         self.columns.set_focus_column(0)
-
-
-
 
         header = urwid.AttrWrap(urwid.Text(self.header_text), 'head')
         footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
