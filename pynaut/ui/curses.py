@@ -155,22 +155,21 @@ class PynautTreeBrowser:
 
         self.topnode = ContainerNode(data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
+        self.container_detail_box = urwid.Padding(get_container_list_box(), left=20, right=20)
+        self.container_tree_list_box._container_detail_listbox = self.container_detail_box
 
-        self.container_detail_listbox = get_container_list_box()
-
-        self.infobox = urwid.Padding(self.container_detail_listbox, left=20, right=20)
-        self.container_tree_list_box._container_detail_listbox = self.infobox
-
-        self.columns = urwid.Columns([self.container_tree_list_box, self.infobox])
-
+        self.columns = urwid.Columns(
+            [
+                self.container_tree_list_box,
+                self.container_detail_box
+             ])
         self.columns.set_focus_column(0)
 
-        view = urwid.AttrWrap(self.columns, 'body')
-        self.view = urwid.Frame(view) # for showing messages
+        self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'))
 
     def main(self):
         global loop
-        self.loop = urwid.MainLoop(self.view, self.palette, unhandled_input=self.unhandled_input)
+        self.loop = urwid.MainLoop(self.topmost, self.palette, unhandled_input=self.unhandled_input)
         loop = self.loop
         self.loop.run()
 
