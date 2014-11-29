@@ -14,6 +14,121 @@ fh.setLevel(logging.DEBUG)
 logger.addHandler(fh)
 
 
+class DialogFrame(urwid.Frame):
+    def keypress(self, size, key):
+        if key == 'tab':
+            if self.focus_part == 'body':
+                self.set_focus('footer')
+                return None
+            elif self.focus_part == 'footer':
+                self.set_focus('body')
+                return None
+            else:
+                self.__super.keypress(size, key)
+        return self.__super.keypress(size, key)
+
+class EditDialog(urwid.WidgetWrap):
+
+    __metaclass__ = urwid.signals.MetaSignals
+    signals = ['commit_text']
+
+    palette = [
+        (None, 'dark red', 'light gray'),  # Make it visible
+        ('body', 'black', 'light gray'),
+        ('flagged', 'black', 'dark green', ('bold','underline')),
+        ('focus', 'light gray', 'dark blue', 'standout'),
+        ('flagged focus', 'yellow', 'dark cyan',
+                ('bold','standout','underline')),
+        ('head', 'yellow', 'black', 'standout'),
+        ('foot', 'light gray', 'black'),
+        ('key', 'light cyan', 'black','underline'),
+        ('title', 'white', 'black', 'bold'),
+        ('dirmark', 'black', 'dark cyan', 'bold'),
+        ('flag', 'dark gray', 'light gray'),
+        ('error', 'dark red', 'light gray'),
+        ('border','black','white'),
+        ('shadow','white','black'),
+        ('selectable','black', 'dark cyan'),
+        ('focustext','light gray','dark blue'),
+        ('button normal','light gray', 'dark blue', 'standout'),
+        ('button select','white',      'dark green'),
+        ]
+    parent = None
+    def __init__(self, width, height, header_text=None, editor_label=None, loop=None):
+        width = int(width)
+        if width <= 0:
+            width = ('relative', 80)
+        height = int(height)
+        if height <= 0:
+            height = ('relative', 80)
+
+        self.edit = urwid.Edit()
+        self.body = urwid.ListBox(urwid.SimpleListWalker([
+            urwid.AttrWrap(urwid.Text(editor_label), None, 'reveal focus'),
+            urwid.AttrWrap(self.edit, None, 'reveal focus'),
+        ]))
+        self.frame = DialogFrame(self.body, focus_part = 'body')
+
+        if header_text is not None:
+            self.frame.header = urwid.Pile( [urwid.Text(header_text),
+                urwid.Divider(u'\u2550')] )
+        w = self.frame
+
+        # pad area around listbox
+        w = urwid.Padding(w, ('fixed left',2), ('fixed right',2))
+        w = urwid.Filler(w, ('fixed top',1), ('fixed bottom',1))
+        w = urwid.AttrWrap(w, 'body')
+
+        w = urwid.LineBox(w)
+
+        # "shadow" effect
+        w = urwid.Columns( [w,('fixed', 1, urwid.AttrWrap(
+            urwid.Filler(urwid.Text(('border',' ')), "top")
+            ,'shadow'))])
+        w = urwid.Frame( w, footer =
+            urwid.AttrWrap(urwid.Text(('border',' ')),'shadow'))
+        if loop is None:
+            # this dialog is the main window
+            # create outermost border area
+            w = urwid.Padding(w, 'center', width )
+            w = urwid.Filler(w, 'middle', height )
+            w = urwid.AttrWrap( w, 'border' )
+        else:
+            # this dialog is a child window
+            # overlay it over the parent window
+            self.loop = loop
+            self.parent = self.loop.widget
+            w = urwid.Overlay(w, self.parent, 'center', width+2, 'middle', height+2)
+        self.view = w
+
+        urwid.WidgetWrap.__init__(self, self.view)
+
+        self._add_buttons([("OK", 0, self._ok), ("Cancel", 1, self._cancel)])
+
+    def _add_buttons(self, buttons):
+        l = []
+        for name, exitcode, callback in buttons:
+            b = urwid.Button(name, callback)
+            b.exitcode = exitcode
+            b = urwid.AttrWrap( b, 'button normal','button select' )
+            l.append( b )
+        self.buttons = urwid.GridFlow(l, 10, 3, 1, 'center')
+        self.frame.footer = urwid.Pile( [ urwid.Divider(u'\u2500'),
+            self.buttons ], focus_item = 1)
+
+    def _button(self, *args, **kwargs):
+        self.loop.widget = self.parent
+
+    def _ok(self, *args, **kwargs):
+        urwid.emit_signal(self, 'commit_text', self.edit.get_edit_text())
+        self._button(self, *args, **kwargs)
+
+    def _cancel(self, *args, **kwargs):
+        self._button(self, *args, **kwargs)
+
+    def show(self):
+        self.loop.widget = self.view
+
 class PynautTreeWidget(urwid.TreeWidget):
     unexpanded_icon = urwid.AttrMap(urwid.TreeWidget.unexpanded_icon,
         'dirmark')
@@ -67,11 +182,20 @@ class ContainerNode(urwid.ParentNode):
         self.container_object = args[0]
         urwid.ParentNode.__init__(self, *args, **kwargs)
 
+    def get_center_header_text(self):
+        text = []
+        text.append(u' ##### [ {0} ] ##### '.format(self.container_object.metadata.name))
+        text.append(u'known object count: {0}'.format(self.container_object.container_cache_size))
+        text = u'\n'.join(text)
+        return text
+
     def get_container_info_widget(self):
         body = [urwid.Text('--- [' + str(self.container_object.metadata.name) + '] ---'), urwid.Divider()]
         metadata = [
             ('id()', self.container_object.metadata.id),
             ('type', self.container_object.metadata.type),
+            ('doc', self.container_object.metadata.doc),
+            ('file', self.container_object.metadata.file),
         ]
         for name, value in metadata:
             text = urwid.Text('{0}:   {1}'.format(name, value))
@@ -162,30 +286,34 @@ class PynautTreeBrowser:
         footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
         self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
 
+    def find_object_by_regex(self, regex):
+        pass
+
     def main(self):
         global loop
-        self.loop = urwid.MainLoop(self.topmost, self.palette, unhandled_input=self.unhandled_input)
+        self.loop = urwid.MainLoop(self.topmost, self.palette, unhandled_input=self.unhandled_input, pop_ups=True)
         loop = self.loop
         self.loop.run()
 
     def unhandled_input(self, k):
         if k in ('q','Q'):
             raise urwid.ExitMainLoop()
+        if k in ('t', 'T'):
+            d = dialog.EditDialog(40, 10, 'Find Object by Attribute Regex', 'python regex: ', self.loop)
+            urwid.connect_signal(d, 'commit_text', self.find_object_by_regex)
+            d.show()
 
     def on_listbox_node_change(self, *args, **kwargs):
         node = args[0]
-        container_instance = node.container_object
+
         list_box = node.get_container_info_widget()
         self.container_detail_box.original_widget = list_box
-        text = []
-        text.append(u' ##### [ {0} ] ##### '.format(container_instance.metadata.name))
-        text.append(u'known object count: {0}'.format(container_instance.container_cache_size))
-        text = u'\n'.join(text)
+        text = node.get_center_header_text()
         self.header_center.set_text(text)
 
 def main(python_object=None):
     if python_object is None:
-        python_object = os
+        python_object = globals()
     root = Container(python_object)
     PynautTreeBrowser(root).main()
 
