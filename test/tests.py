@@ -50,4 +50,4 @@ def test_convenience_functions():
 
     base_types = [t for t in vars(types).values() if isinstance(t, types.TypeType)]
     for t in base_types:
-        attrs = list(find_attrs_by_type(t))
+        attrs = list(obj.find_attrs_by_type(t))
