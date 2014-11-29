@@ -36,7 +36,7 @@ setup(
         'Topic :: Software Development',
         'Topic :: Utilities',
     ],
-    packages=[NAME],
+    packages=[NAME, NAME+'.ui'],
     keywords=['introspection', 'debugging'],
     test_suite='nose.collector',
     test_requires=['nose'],
