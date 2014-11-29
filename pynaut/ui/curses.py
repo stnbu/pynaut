@@ -67,6 +67,17 @@ class ContainerNode(urwid.ParentNode):
         self.container_object = args[0]
         urwid.ParentNode.__init__(self, *args, **kwargs)
 
+    def get_container_info_widget(self):
+        body = [urwid.Text('--- [' + str(self.container_object.metadata.name) + '] ---'), urwid.Divider()]
+        metadata = [
+            ('id()', self.container_object.metadata.id),
+            ('type', self.container_object.metadata.type),
+        ]
+        for name, value in metadata:
+            text = urwid.Text('{0}:   {1}'.format(name, value))
+            body.append(urwid.AttrMap(text, None, focus_map='reversed'))
+        return urwid.ListBox(urwid.SimpleFocusListWalker(body))
+
     def load_widget(self):
         return PynautTreeWidget(self)
 
@@ -80,24 +91,6 @@ class ContainerNode(urwid.ParentNode):
                           parent=self,
                           key=key,
                           depth=self.get_depth()+1)
-
-def get_container_list_box(container_instance=None):
-
-    if container_instance is not None:
-        body = [urwid.Text('--- [' + str(container_instance.metadata.name) + '] ---'), urwid.Divider()]
-        metadata = [
-            ('id()', container_instance.metadata.id),
-            ('type', container_instance.metadata.type),
-        ]
-    else:
-        body = [urwid.Text(''), urwid.Divider()]
-        metadata = []
-
-    for name, value in metadata:
-        text = urwid.Text('{0}:   {1}'.format(name, value))
-        body.append(urwid.AttrMap(text, None, focus_map='reversed'))
-
-    return urwid.ListBox(urwid.SimpleFocusListWalker(body))
 
 class ContainerTreeListBox(urwid.TreeListBox):
 
@@ -149,7 +142,7 @@ class PynautTreeBrowser:
 
         self.topnode = ContainerNode(data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
-        self.container_detail_box = pad(get_container_list_box())
+        self.container_detail_box = pad(self.topnode.get_container_info_widget())
 
         self.container_tree_list_box.on_listbox_node_change = self.on_listbox_node_change
 
@@ -182,10 +175,13 @@ class PynautTreeBrowser:
     def on_listbox_node_change(self, *args, **kwargs):
         node = args[0]
         container_instance = node.container_object
-        list_box = get_container_list_box(container_instance)
+        list_box = node.get_container_info_widget()
         self.container_detail_box.original_widget = list_box
-        attr_name = u' ##### [ {0} ] ##### '.format(container_instance.metadata.name)
-        self.header_center.set_text(attr_name)
+        text = []
+        text.append(u' ##### [ {0} ] ##### '.format(container_instance.metadata.name))
+        text.append(u'known object count: {0}'.format(container_instance.container_cache_size))
+        text = u'\n'.join(text)
+        self.header_center.set_text(text)
 
 def main(python_object=None):
     if python_object is None:
