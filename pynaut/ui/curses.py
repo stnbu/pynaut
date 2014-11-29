@@ -2,6 +2,7 @@
 from pynaut import Container
 import urwid
 import os
+import re
 import logging
 
 logger = logging.getLogger('')
@@ -12,6 +13,7 @@ file_formatter = logging.Formatter('%(asctime)s %(name)-12s(%(lineno)s): %(level
 fh.setFormatter(file_formatter)
 fh.setLevel(logging.DEBUG)
 logger.addHandler(fh)
+
 
 
 class DialogFrame(urwid.Frame):
@@ -182,6 +184,10 @@ class ContainerNode(urwid.ParentNode):
         self.container_object = args[0]
         urwid.ParentNode.__init__(self, *args, **kwargs)
 
+    def forget_children(self):
+        self._child_keys = None
+        self._children = {}
+
     def get_center_header_text(self):
         text = []
         text.append(u' ##### [ {0} ] ##### '.format(self.container_object.metadata.name))
@@ -264,7 +270,8 @@ class PynautTreeBrowser:
         def pad(w):
             return urwid.Padding(w, left=20, right=20)
 
-        self.topnode = ContainerNode(data)
+        self.data = data
+        self.topnode = ContainerNode(self.data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
         self.container_detail_box = pad(self.topnode.get_container_info_widget())
 
@@ -286,8 +293,15 @@ class PynautTreeBrowser:
         footer = urwid.AttrWrap(urwid.Text(self.footer_text), 'foot')
         self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
 
-    def find_object_by_regex(self, regex):
-        pass
+    def set_container_tree_filter_regex(self, regex):
+        if not isinstance(regex, basestring):
+            regex = regex[0]
+        reg = re.compile(regex)
+        filt = lambda c: reg.search(c.metadata.name) is None
+        Container.filters = [filt]  # FIXME
+        self.topnode.forget_children()
+        self.container_tree_list_box.focus_home((0,0))
+        self.container_tree_list_box.collapse_focus_parent((0,0))
 
     def main(self):
         global loop
@@ -298,9 +312,9 @@ class PynautTreeBrowser:
     def unhandled_input(self, k):
         if k in ('q','Q'):
             raise urwid.ExitMainLoop()
-        if k in ('t', 'T'):
-            d = EditDialog(40, 10, 'Find Object by Attribute Regex', 'python regex: ', self.loop)
-            urwid.connect_signal(d, 'commit_text', self.find_object_by_regex)
+        if k.lower() == 'f':
+            d = EditDialog(50, 10, 'Filter Object Tree', 'python regex to apply to attribute name: ', self.loop)
+            urwid.connect_signal(d, 'commit_text', self.set_container_tree_filter_regex)
             d.show()
 
     def on_listbox_node_change(self, *args, **kwargs):
@@ -313,7 +327,7 @@ class PynautTreeBrowser:
 
 def main(python_object=None):
     if python_object is None:
-        python_object = globals()
+        python_object = os # globals()
     root = Container(python_object)
     PynautTreeBrowser(root).main()
 
