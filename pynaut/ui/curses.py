@@ -299,7 +299,7 @@ class PynautTreeBrowser:
         if k in ('q','Q'):
             raise urwid.ExitMainLoop()
         if k in ('t', 'T'):
-            d = dialog.EditDialog(40, 10, 'Find Object by Attribute Regex', 'python regex: ', self.loop)
+            d = EditDialog(40, 10, 'Find Object by Attribute Regex', 'python regex: ', self.loop)
             urwid.connect_signal(d, 'commit_text', self.find_object_by_regex)
             d.show()
 
