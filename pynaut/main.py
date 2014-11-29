@@ -82,6 +82,15 @@ class ObjectMetaData(object):
     def isclass(self):
         return isinstance(self.obj, (types.ClassType, types.TypeType))
 
+    @property
+    def doc(self):
+        return self.obj.__doc__ or u''
+
+    @property
+    def file(self):
+        return getattr(self.obj, '__file__', u'')
+
+
 class Container(object):
 
     def __init__(self, obj, parent=None):
