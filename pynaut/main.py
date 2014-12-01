@@ -90,10 +90,41 @@ class ObjectMetaData(object):
     def file(self):
         return getattr(self.obj, '__file__', u'')
 
+    @property
+    def ismodule(self):
+        return isinstance(self.obj, types.ModuleType)
+
+    @property
+    def belongs_to_module(self):
+        return hasattr(self.obj, '__module__') and self.obj.__module__ is not None
+
+    @property
+    def parent_module(self):
+        if self.belongs_to_module:
+            return sys.modules[self.obj.__module__]
+
+    @property
+    def imported_names(self):
+        if self.ismodule:
+            return [k for k,v in sys.modules.items() if v is self.obj]
+        else:
+            return []
+
+    @property
+    def known_aliases(self):
+        names = [c.metadata.name for c in GLOBAL_CACHE.itervalues() if c.obj is self.obj]
+        names = list(set(names) - set([self.name]))
+        return names
+
+    # also:
+    # * bound-to module
+    # * handle container types
+
 
 class Container(object):
 
-    filters = []
+    f = lambda c: not c.metadata.name.startswith('_')
+    filters = [f]
 
     def __init__(self, obj, parent=None):
         assert obj is not self  # Avoid some very confusing situations.
@@ -120,6 +151,8 @@ class Container(object):
     @property
     @profile
     def children(self):
+        def compare_children(a, b):
+            return cmp(a.metadata.name.lower(), b.metadata.name.lower())
         global GLOBAL_CACHE
         _dict = {}
         for name in dir(self.obj):
@@ -129,7 +162,7 @@ class Container(object):
                 logger.warn('Having to return dummy value for attribute "{0}" (error: {1})'.format(name, str(e)))
                 _dict[name] = DUMMY_VALUE
 
-        children = ContainerCollection()
+        children = []
         for attr, value in _dict.iteritems():
 
             child = GLOBAL_CACHE.get(id(value), None)
@@ -142,14 +175,14 @@ class Container(object):
         if self.filters:
             for filt in self.filters:
                 children = [c for c in children if filt(c)]
-        return children
+        return sorted(children, cmp=compare_children)
 
     @property
     @profile
     def ancestry(self):
         if self._ancestry is not None:
             return self._ancestry
-        self._ancestry = ContainerCollection()
+        self._ancestry = []
         o = self
         while True:
             self._ancestry.append(o)
