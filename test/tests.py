@@ -19,6 +19,14 @@ def test_testdata():
     len(list(obj.get_attr_matches(test))),
     ]
     expected = [3, 4, 3, 88]
+    print >>sys.stderr, '8'*200
+    print >>sys.stderr, '8'*200
+    print >>sys.stderr, '8'*200
+    print >>sys.stderr, results
+    print >>sys.stderr, '8'*200
+    print >>sys.stderr, '8'*200
+    print >>sys.stderr, '8'*200
+
 
     assert expected == results
 
