@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
+import __builtin__
 from pynaut import Container
 import urwid
 import os
 import re
 import logging
 import curses
+import types
+from collections import OrderedDict
 
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
@@ -14,6 +17,8 @@ file_formatter = logging.Formatter('%(asctime)s %(name)-12s(%(lineno)s): %(level
 fh.setFormatter(file_formatter)
 fh.setLevel(logging.DEBUG)
 logger.addHandler(fh)
+
+from urwid.wimp import SelectableIcon
 
 def make_grid(rows):
     """
@@ -63,13 +68,13 @@ class DialogFrame(urwid.Frame):
             self.escape()
         return self.__super.keypress(size, key)
 
-class EditDialog(urwid.WidgetWrap):
+class DialogBase(urwid.WidgetWrap):
 
     __metaclass__ = urwid.signals.MetaSignals
-    signals = ['commit_text']
+    signals = ['commit']
 
     parent = None
-    def __init__(self, width, height, initial_text='', header_text=None, editor_label=None, loop=None):
+    def __init__(self, width, height, data, header_text=None, loop=None):
         if loop is None:
             raise ValueError('loop is a required argument.')
 
@@ -80,13 +85,9 @@ class EditDialog(urwid.WidgetWrap):
         if height <= 0:
             height = ('relative', 80)
 
-        self.edit = urwid.Edit(initial_text)
-        self.body = urwid.ListBox(urwid.SimpleListWalker([
-            urwid.AttrWrap(urwid.Text(editor_label), None, 'reveal focus'),
-            urwid.AttrWrap(self.edit, None, 'reveal focus'),
-        ]))
-        self.frame = DialogFrame(self.body, focus_part = 'body', escape=self.on_cancel)
+        self.body = self.make_body(data)
 
+        self.frame = DialogFrame(self.body, focus_part = 'body', escape=self.on_cancel)
         if header_text is not None:
             self.frame.header = urwid.Pile( [urwid.Text(header_text),
                 urwid.Divider(u'\u2550')] )
@@ -96,9 +97,7 @@ class EditDialog(urwid.WidgetWrap):
         w = urwid.Padding(w, ('fixed left',2), ('fixed right',2))
         w = urwid.Filler(w, ('fixed top',1), ('fixed bottom',1))
         w = urwid.AttrWrap(w, 'body')
-
         w = urwid.LineBox(w)
-
         # "shadow" effect
         w = urwid.Columns( [w,('fixed', 1, urwid.AttrWrap(
             urwid.Filler(urwid.Text(('border',' ')), "top")
@@ -108,11 +107,14 @@ class EditDialog(urwid.WidgetWrap):
         self.parent = self.loop.widget
         w = urwid.Overlay(w, self.parent, 'center', width+2, 'middle', height+2)
         self.view = w
-
         self._add_buttons([("OK", 0, self.on_ok), ("Cancel", 1, self.on_cancel)])
-
         urwid.WidgetWrap.__init__(self, self.view)
 
+    def make_body(self, data):
+        'please implement'
+
+    def callback(self):
+        'please implement'
 
     def _add_buttons(self, buttons):
         l = []
@@ -129,7 +131,7 @@ class EditDialog(urwid.WidgetWrap):
         self.loop.widget = self.parent
 
     def on_ok(self, *args, **kwargs):
-        urwid.emit_signal(self, 'commit_text', self.edit.get_edit_text())
+        urwid.emit_signal(self, 'commit', self.callback())
         self._button(self, *args, **kwargs)
 
     def on_cancel(self, *args, **kwargs):
@@ -138,18 +140,30 @@ class EditDialog(urwid.WidgetWrap):
     def show(self):
         self.loop.widget = self.view
 
-    def keypress(self, size, key):
-        if key == 'esc':
-            self.loop.widget = self.parent
-        elif key == '7':
-            self.loop.widget = self.parent
-        return self.__super.keypress(size, key)
+class AttrTypeDialog(DialogBase):
+    def make_body(self, data):
+        self.checkboxes = []
+        for label, values in data.iteritems():
+            _unused, state = values
+            self.checkboxes.append(urwid.CheckBox(label, state=state))
+        return urwid.ListBox(urwid.SimpleListWalker(self.checkboxes))
+    def callback(self):
+        return self.checkboxes
+
+class EditDialog(DialogBase):
+    def make_body(self, data):
+        edit_text, editor_label = data
+        self.edit = urwid.Edit(edit_text=edit_text)
+        body = urwid.ListBox(urwid.SimpleListWalker([
+            urwid.AttrWrap(urwid.Text(editor_label), None, 'reveal focus'),
+            urwid.AttrWrap(self.edit, None, 'reveal focus'),
+        ]))
+        return body
+    def callback(self):
+        return self.edit.get_edit_text()
 
 class PynautTreeWidget(urwid.TreeWidget):
-    unexpanded_icon = urwid.AttrMap(urwid.TreeWidget.unexpanded_icon,
-        'dirmark')
-    expanded_icon = urwid.AttrMap(urwid.TreeWidget.expanded_icon,
-        'dirmark')
+    leaf_container_icon = SelectableIcon(' ', 0)
 
     def __init__(self, node):
         self.__super.__init__(node)
@@ -158,16 +172,23 @@ class PynautTreeWidget(urwid.TreeWidget):
         self.update_w()
         self.expanded = False
         self.flagged_nodes = set()
+        self.update_expanded_icon()
+        self.is_leaf = node.container_object.is_leaf
 
     def selectable(self):
         return True
 
     def keypress(self, size, key):
-        """allow subclasses to intercept keystrokes"""
+        self.update_expanded_icon()
         key = self.__super.keypress(size, key)
-        if key:
-            key = self.unhandled_keys(size, key)
-        return key
+        if key in ('+', 'enter', '\\'):
+            self.expanded = True
+            self.update_expanded_icon()
+        elif key in ('left', '-'):
+            self.expanded = False
+            self.update_expanded_icon()
+        else:
+            return key
 
     def unhandled_keys(self, size, key):
         if key == " ":
@@ -185,8 +206,6 @@ class PynautTreeWidget(urwid.TreeWidget):
             return key
 
     def update_w(self):
-        """Update the attributes of self.widget based on self.flagged.
-        """
         if self.flagged:
             self._w.attr = 'flagged'
             self._w.focus_attr = 'flagged focus'
@@ -194,28 +213,48 @@ class PynautTreeWidget(urwid.TreeWidget):
             self._w.attr = 'body'
             self._w.focus_attr = 'focus'
 
-    def get_display_text(self):
-        return self.get_node().get_value()['summary']
+    def load_inner_widget(self):
+        return urwid.Text(self.get_node().get_value()['name'])
+
+    def update_expanded_icon(self):
+        container_object = self.get_node().get_value()
+        if container_object.is_leaf:
+            self._w.base_widget.widget_list[0] = self.leaf_container_icon
+        else:
+            self._w.base_widget.widget_list[0] = [
+                self.unexpanded_icon, self.expanded_icon][self.expanded]
+
+
+
+
 
 class ContainerNode(urwid.ParentNode):
 
     def __init__(self, *args, **kwargs):
         self.container_object = args[0]
-        self.container_object.children.sort()
+        urwid.ParentNode.__init__(self, *args, **kwargs)
+        self.my_widget = None
 
     def forget_children(self):
         self._child_keys = None
         self._children = {}
 
-    def get_center_header_text(self):
-        text = []
-        text.append(u' ##### [ {0} ] ##### '.format(self.container_object.metadata.name))
-        text.append(u'known object count: {0}'.format(self.container_object.container_cache_size))
-        text = u'\n'.join(text)
-        return text
+    def load_widget(self):
+        self.my_widget = PynautTreeWidget(self)
+        return self.my_widget
+
+    def load_child_keys(self):
+        return range(len(self.container_object.children))
+
+    def load_child_node(self, key):
+        childdata = self.container_object.children[key]
+        childclass = ContainerNode
+        return childclass(childdata,
+                          parent=self,
+                          key=key,
+                          depth=self.get_depth()+1)
 
     def get_container_info_widget(self):
-        body = [urwid.Text('--- [' + str(self.container_object.metadata.name) + '] ---'), urwid.Divider()]
         metadata = [
             # (height, label, value)
             (1, 'id()', self.container_object.metadata.id),
@@ -228,23 +267,20 @@ class ContainerNode(urwid.ParentNode):
             (20, 'doc', self.container_object.metadata.doc),
         ]
 
-        rows = [[h, urwid.Text(unicode(n)), urwid.Text(unicode(v))] for h, n, v in metadata]
+        rows = []
+        c = 0
+        for height, name, value in metadata:
+            if c % 2:
+                color = 'odd row'
+            else:
+                color = 'even row'
+            c += 1
+            name = urwid.AttrMap(urwid.Text(unicode(name)), color)
+            value = urwid.AttrMap(urwid.Text(unicode(value)), color)
+            rows.append([height, name, value])
         body = make_grid(rows)
         return body
 
-    def load_widget(self):
-        return PynautTreeWidget(self)
-
-    def load_child_keys(self):
-        return range(len(self.container_object.children))
-
-    def load_child_node(self, key):
-        childdata = self.container_object.children[key]
-        childclass = ContainerNode
-        return childclass(childdata,
-                          parent=self,
-                          key=key,
-                          depth=self.get_depth()+1)
 
 class ContainerTreeListBox(urwid.TreeListBox):
 
@@ -292,13 +328,25 @@ class PynautTreeBrowser:
 
     def __init__(self, data=None):
 
-        def pad(w):
-            return urwid.Padding(w, left=1, right=1)
+        self.original_filters = []
+        self.original_filters[:] = Container.filters
+        self.grep_filter = None
+        self.type_filter = None
 
+        self.type_filter_states = OrderedDict()
+        ## format:
+        #self.type_filter_states = {
+        #    'Friendly Name': (SomeType, True),
+        #    # also...
+        #    'Friendly Name Two': ((SomeType1, SomeType2), True),
+        builtin_types = set([t for t in vars(types).values() if t.__class__ is types.TypeType])  # FIXME
+        builtin_types = OrderedDict(sorted([(x.__name__, (x, True)) for x in builtin_types]))
+        self.type_filter_states.update(builtin_types)
+        self.attr_filter_reg = None
         self.data = data
         self.topnode = ContainerNode(self.data)
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
-        self.container_detail_box = pad(self.topnode.get_container_info_widget())
+        self.container_detail_box = urwid.WidgetPlaceholder(self.topnode.get_container_info_widget())
         self.container_tree_list_box.on_listbox_node_change = self.on_listbox_node_change
 
         self.columns = urwid.Columns(
@@ -318,15 +366,40 @@ class PynautTreeBrowser:
 
         self.topmost = urwid.Frame(urwid.AttrWrap(self.columns, 'body'), header=header, footer=footer)
 
-    def set_container_tree_filter_regex(self, regex):
-        if not isinstance(regex, basestring):
-            regex = regex[0]
-        reg = re.compile(regex)
-        filt = lambda c: reg.search(c.metadata.name) is None
-        Container.filters = [filt]  # FIXME
+    def on_filter_change(self):
+        Container.filters[:] = self.original_filters
+        for filter in  self.type_filter, self.grep_filter:
+            if filter is not None:
+                Container.filters.append(filter)
         self.topnode.forget_children()
         self.container_tree_list_box.focus_home((0,0))
         self.container_tree_list_box.collapse_focus_parent((0,0))
+        omnilog.error('1  '+str(Container.filters))
+
+    def set_attr_type_filters(self, *args, **kwargs):
+        checkboxes, = args
+        for checkbox in checkboxes:
+            types = self.type_filter_states[checkbox.label][0]
+            self.type_filter_states[checkbox.label] = (types, checkbox.state)
+        enabled_types = []
+        for label, values in self.type_filter_states.iteritems():
+            types, enabled = values
+            if not enabled:
+                continue
+            if not isinstance(types, tuple):
+                types = (types,)
+            enabled_types.extend(types)
+        enabled_types = tuple(enabled_types)
+        omnilog.error(str(enabled_types))
+        self.type_filter = lambda c: isinstance(c.obj, enabled_types)
+        self.on_filter_change()
+
+    def set_container_tree_filter_regex(self, regex):
+        if not isinstance(regex, basestring):
+            regex = regex[0]
+        self.attr_filter_reg = re.compile(regex)
+        self.grep_filter = lambda c: self.attr_filter_reg.search(c.metadata.name) is None
+        self.on_filter_change()
 
     def main(self):
         self.loop = urwid.MainLoop(self.topmost, self.palette, unhandled_input=self.unhandled_input, pop_ups=True)
@@ -337,15 +410,18 @@ class PynautTreeBrowser:
         if k in ('q','Q'):
             raise urwid.ExitMainLoop()
         if k.lower() == 'f':
-            if Container.filters:  # FIXME: no easy way to get current filter
-                regex = Container.filters[0]
+            if self.attr_filter_reg is None:
+                edit_text = ''
             else:
-                regex = ''
-            d = EditDialog(50, 10, initial_text='',
+                edit_text = self.attr_filter_reg.pattern
+            d = EditDialog(50, 10, data=(edit_text, 'python regex to apply to attribute name: '),
                            header_text='Filter Object Tree',
-                           editor_label='python regex to apply to attribute name: ',
                            loop=self.loop)
-            urwid.connect_signal(d, 'commit_text', self.set_container_tree_filter_regex)
+            urwid.connect_signal(d, 'commit', self.set_container_tree_filter_regex)
+            d.show()
+        if k.lower() == 't':
+            d = AttrTypeDialog(50, 30, data=self.type_filter_states, header_text='Choose Attribute Types to Include', loop=self.loop)
+            urwid.connect_signal(d, 'commit', self.set_attr_type_filters)
             d.show()
 
     def on_listbox_node_change(self, *args, **kwargs):
