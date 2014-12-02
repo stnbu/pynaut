@@ -46,9 +46,10 @@ class ContainerCollection(list):
 
 class ObjectMetaData(object):
 
-    def __init__(self, obj):
+    def __init__(self, obj, **kwargs):
         self.obj = obj
-        self.name = None
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
 
     @property
     def callable(self):
@@ -129,9 +130,24 @@ class Container(object):
     def __init__(self, obj, parent=None):
         assert obj is not self  # Avoid some very confusing situations.
         self.obj = obj
-        self._metadata = None
+        self.metadata = ObjectMetaData(obj)
         self._ancestry = None
         self.parent = parent
+        if self.parent == None:  # I am the root node.
+            name = getattr(self.obj, '__name__', None)
+            if name is None:
+                name = repr(self.obj)
+            name = name + ' (root node)'
+            self.name = name
+            self.metadata.name = self.name
+
+    @property
+    def has_children(self):
+        return bool(len(self.children))
+
+    @property
+    def is_leaf(self):
+        return not self.has_children
 
     @property
     def container_cache_size(self):
@@ -140,13 +156,6 @@ class Container(object):
     @property
     def root_container(self):
         return self.ancestry[-1]
-
-    @property
-    @profile
-    def metadata(self):
-        if self._metadata is None:
-            self._metadata = ObjectMetaData(self.obj)
-        return self._metadata
 
     @property
     @profile
