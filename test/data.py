@@ -34,7 +34,7 @@ class Convoluted(object):
     decimal_context = decimal.Context()
 
     def __init__(self, *args, **kwargs):
-        self.decimal = decimal.Decimal(0.001)
+        self.decimal = decimal.Decimal('0.001')
         import unicodedata
         self.unicodedata = unicodedata
         self.latin_small_letter_x = unicodedata.name(u'x')

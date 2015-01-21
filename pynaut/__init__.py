@@ -61,4 +61,4 @@ descending through the attribute tree.
 
 """
 
-from main import *
+from pynaut.main import *

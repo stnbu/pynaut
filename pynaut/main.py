@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import __builtin__
+try:
+    import __builtin__
+    builtins = __builtin__
+except ImportError:
+    import builtins
 import sys
 import re
 import logging
@@ -159,7 +163,7 @@ class Container(object):
             return False
     @property
     def isbuiltin(self):
-        return self.obj in vars(__builtin__).values()
+        return self.obj in vars(builtins).values()
     @property
     def isbasetype(self):
         return self.type in [t for t in vars(types).values() if isinstance(t, types.TypeType)]

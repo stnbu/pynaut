@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-import __builtin__
+
+try:
+    import __builtin__
+    builtins = __builtin__
+except ImportError:
+    import builtins
 from pynaut import Container
 import urwid
 import os
