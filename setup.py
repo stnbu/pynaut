@@ -25,7 +25,6 @@ setup(
     download_url='https://github.com/stnbu/{0}/archive/master.zip'.format(NAME),
     provides=[NAME],
     license='MIT',
-    bugtrack_url='https://github.com/stnbu/{0}/issues'.format(NAME),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -39,10 +38,10 @@ setup(
     packages=[NAME, NAME+'.ui'],
     keywords=['introspection', 'debugging'],
     test_suite='nose.collector',
-    test_requires=['nose'],
+    requires=['urwid', 'UniCurses'],
     entry_points={
         'console_scripts': [
-            'pynaut_curses = pynaut.ui.curses:main',
+            '%s = %s.ui.curses:main' % (NAME, NAME),
         ],
         'gui_script': []},
 )

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
 import types
@@ -10,7 +11,7 @@ def test_testdata():
     """
     obj = Container(data)
 
-    test = lambda c: c.metadata.name.lower().startswith('a')
+    test = lambda c: c.name.lower().startswith('a')
 
     results = [
     len(list(obj.grep_attr_names('^S'))),
@@ -18,18 +19,8 @@ def test_testdata():
     len(list(obj.grep_attr_names('^real$'))),
     len(list(obj.get_attr_matches(test))),
     ]
-    expected = [3, 4, 3, 88]
-    print >>sys.stderr, '8'*200
-    print >>sys.stderr, '8'*200
-    print >>sys.stderr, '8'*200
-    print >>sys.stderr, results
-    print >>sys.stderr, '8'*200
-    print >>sys.stderr, '8'*200
-    print >>sys.stderr, '8'*200
-
-
+    expected = [2, 0, 426, 1866]
     assert expected == results
-
 
 def _test_repeated_search(obj, search_reg):
     obj = Container(obj)

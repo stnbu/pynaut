@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Lots of interesting test data."""
 
 complex_type = complex(1, 2)

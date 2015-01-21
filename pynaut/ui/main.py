@@ -424,6 +424,7 @@ class ContainerNode(urwid.ParentNode):
 
     def __init__(self, *args, **kwargs):
         self.container_object = args[0]
+        self.children = list(self.container_object.children)
         urwid.ParentNode.__init__(self, *args, **kwargs)
         self.my_widget = None
 
@@ -436,10 +437,10 @@ class ContainerNode(urwid.ParentNode):
         return self.my_widget
 
     def load_child_keys(self):
-        return range(len(self.container_object.children))
+        return range(len(list(self.container_object.children)))
 
     def load_child_node(self, key):
-        childdata = self.container_object.children[key]
+        childdata = self.children[key]
         childclass = ContainerNode
         return childclass(childdata,
                           parent=self,
@@ -449,14 +450,14 @@ class ContainerNode(urwid.ParentNode):
     def get_container_info_widget(self):
         metadata = [
             # (height, label, value)
-            (1, 'id()', self.container_object.metadata.id),
-            (1, 'type', self.container_object.metadata.type),
-            (1, 'file', self.container_object.metadata.file),
-            (1, 'is module', self.container_object.metadata.ismodule),
-            (1, 'parent module', self.container_object.metadata.parent_module),
-            (3, 'names in sys.modules', self.container_object.metadata.imported_names),
-            (3, 'known aliases', self.container_object.metadata.known_aliases),
-            (20, 'doc', self.container_object.metadata.doc),
+            (1, 'id()', self.container_object.id),
+            (1, 'type', self.container_object.type),
+            (1, 'file', self.container_object.file),
+            (1, 'is module', self.container_object.ismodule),
+            (1, 'parent module', self.container_object.parent_module),
+            (3, 'names in sys.modules', self.container_object.imported_names),
+            (3, 'known aliases', self.container_object.known_aliases),
+            (20, 'doc', self.container_object.doc),
         ]
 
         rows = []
@@ -568,8 +569,7 @@ class PynautTreeBrowser:
         )
 
     def embed(self):
-        pass
-        #embed(header='', banner1='', banner2='')
+        embed(header='', banner1='', banner2='')
 
     def on_filter_change(self):
         Container.filters[:] = self.original_filters
@@ -601,7 +601,7 @@ class PynautTreeBrowser:
         if not isinstance(regex, basestring):
             regex = regex[0]
         self.attr_filter_reg = re.compile(regex)
-        self.grep_filter = lambda c: self.attr_filter_reg.search(c.metadata.name) is None
+        self.grep_filter = lambda c: self.attr_filter_reg.search(c.name) is None
         self.on_filter_change()
 
     def main(self):
