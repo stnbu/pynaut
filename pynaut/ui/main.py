@@ -12,171 +12,151 @@ from IPython import embed
 import pty
 from random import choice
 import atexit
+from urwid.vterm import KEY_TRANSLATIONS
+from urwid.wimp import SelectableIcon
 
-logger = logging.getLogger(__name__)
-
-from urwid.vterm import KEY_TRANSLATIONS  # FIXME: monkeypatch badness
+# FIXME: monkeypatch badness
 KEY_TRANSLATIONS['enter'] = chr(10)
 KEY_TRANSLATIONS['home'] = chr(27) + '[H'
 KEY_TRANSLATIONS['end'] = chr(27) + '[F'
 
-from urwid.wimp import SelectableIcon
+LOOP = None
 
-palette_dict = {
-    'body': ('black', 'light gray'),
-    'dirmark': ('black', 'dark cyan', 'bold'),
-    'error': ('dark red', 'light gray'),
-    'even row': ('dark gray', 'light gray'),
-    'flag': ('dark gray', 'light gray'),
-    'flagged focus': ('yellow', 'dark cyan', ('bold','standout','underline')),
-    'flagged': ('black', 'dark green', ('bold','underline')),
-    'focus': ('light gray', 'dark blue', 'standout'),
-    'foot': ('light gray', 'black'),
-    'head': ('yellow', 'black', 'standout'),
-    'key': ('light cyan', 'black','underline'),
-    'odd row': ('light gray', 'dark gray'),
-    'title': ('white', 'black', 'bold'),
-}
+logger = logging.getLogger(__name__)
 
 config = {
     'prompt_on_quit': False,
 }
 
+palette = [
 
-def get_palette():
+    # palette stolen from pudb project:
+    # https://pypi.python.org/pypi/pudb
 
-    from pudb.theme import get_palette, THEMES
-    p = get_palette(False, choice(THEMES))
-    for l in p:
-        palette_dict[l[0]] = l[1:]
+    ('comment', 'light gray', 'dark blue'),
+    ('punctuation', 'light gray', 'dark blue'),
+    ('search box', 'black', 'dark cyan'),
+    ('variables', 'black', 'dark cyan'),
+    ('focused var label', 'dark blue', 'dark green'),
+    ('doublestring', 'light magenta,bold', 'dark blue'),
+    ('focused command line output', 'black', 'dark green'),
+    ('var label', 'dark blue', 'dark cyan'),
+    ('header', 'black', 'light gray', 'standout'),
+    ('line number', 'light gray', 'dark blue'),
+    ('warning', 'white,bold', 'dark red', 'standout'),
+    ('focused current frame class', 'dark blue', 'dark green'),
+    ('command line clear button', 'white,bold', 'dark blue'),
+    ('breakpoint source', 'yellow,bold', 'dark red'),
+    ('stack', 'black', 'dark cyan'),
+    ('focused current frame name', 'white,bold', 'dark green', 'bold'),
+    ('current breakpoint focused source', 'white', 'dark red'),
+    ('focused current frame location', 'light cyan', 'dark green'),
+    ('command line focused button', 'light cyan', 'black'),
+    ('frame name', 'black', 'dark cyan'),
+    ('current focused source', 'white,bold', 'dark cyan'),
+    ('current frame location', 'light cyan', 'dark cyan'),
+    ('command line error', 'light red,bold', 'dark blue'),
+    ('focused highlighted var label', 'white', 'dark green'),
+    ('frame location', 'light cyan', 'dark cyan'),
+    ('label', 'black', 'light gray'),
+    ('source', 'yellow,bold', 'dark blue'),
+    ('literal', 'light magenta, bold', 'dark blue'),
+    ('highlighted var value', 'black', 'dark cyan'),
+    ('group head', 'dark blue,bold', 'light gray'),
+    ('focused sidebar', 'yellow,bold', 'light gray', 'standout'),
+    ('var value', 'black', 'dark cyan'),
+    ('focused command line error', 'black', 'dark green'),
+    ('variable separator', 'dark cyan', 'light gray'),
+    ('focused return value', 'black', 'dark green'),
+    ('current source', 'black', 'dark cyan'),
+    ('focused breakpoint', 'black', 'dark green'),
+    ('focused frame class', 'dark blue', 'dark green'),
+    ('command line edit', 'yellow,bold', 'dark blue'),
+    ('string', 'light magenta,bold', 'dark blue'),
+    ('focused return label', 'light gray', 'dark blue'),
+    ('command line prompt', 'white,bold', 'dark blue'),
+    ('current highlighted source', 'white', 'dark cyan'),
+    ('highlighted var label', 'white', 'dark cyan'),
+    ('docstring', 'light magenta,bold', 'dark blue'),
+    ('current breakpoint', 'white,bold', 'dark cyan'),
+    ('focused button', 'light cyan', 'black'),
+    ('focused frame location', 'light cyan', 'dark green'),
+    ('singlestring', 'light magenta,bold', 'dark blue'),
+    ('focused command line input', 'light cyan,bold', 'dark green'),
+    ('background', 'black', 'light gray'),
+    ('breakpoint', 'black', 'dark cyan'),
+    ('hotkey', 'black,underline', 'light gray', 'underline'),
+    ('command line input', 'light cyan,bold', 'dark blue'),
+    ('selectable', 'black', 'dark cyan'),
+    ('search not found', 'white', 'dark red'),
+    ('current breakpoint source', 'black', 'dark red'),
+    ('fixed value', 'light gray', 'dark blue'),
+    ('focused highlighted var value', 'black', 'dark green'),
+    ('breakpoint focused source', 'black', 'dark red'),
+    ('name', 'light cyan', 'dark blue'),
+    ('keyword', 'white,bold', 'dark blue'),
+    ('frame class', 'dark blue', 'dark cyan'),
+    ('command line output', 'light cyan', 'dark blue'),
+    ('button', 'white,bold', 'dark blue'),
+    ('focused current breakpoint', 'white,bold', 'dark green', 'bold'),
+    ('breakpoint marker', 'dark red', 'dark blue'),
+    ('value', 'yellow,bold', 'dark blue'),
+    ('highlighted source', 'black', 'dark magenta'),
+    ('current frame class', 'dark blue', 'dark cyan'),
+    ('focused frame name', 'black', 'dark green'),
+    ('return label', 'white', 'dark blue'),
+    ('return value', 'black', 'dark cyan'),
+    ('focused source', 'black', 'dark green'),
+    ('current frame name', 'white,bold', 'dark cyan'),
+    ('focused var value', 'black', 'dark green'),
+    ('dialog title', 'white,bold', 'dark cyan'),
+    ('focused selectable', 'black', 'dark green'),
+    ####
+    ('object descr box', 'white', 'dark cyan'),
+    ('activity area', 'black', 'dark cyan'),
+    ('border', 'dark cyan', 'dark blue'),
+    ('tree row', 'dark blue', 'dark cyan'),
+    ('flagged', 'dark blue', 'dark green'),
+    ('flagged focus', 'black', 'dark green'),
+    ('focus', 'black', 'dark blue'),
+    ('title', 'black,bold', 'light gray'),
+    ('key', 'light cyan', 'light gray'),
+]
 
-    palette = []
-    for name, value in palette_dict.iteritems():
-        palette.append((name,) + value)
 
-    return palette
+class BorderedLineBox(urwid.LineBox):
 
+    def __init__(self, original_widget, title="",
+                 tlcorner=u'┌', tline=u'─', lline=u'│',
+                 trcorner=u'┐', blcorner=u'└', rline=u'│',
+                 bline=u'─', brcorner=u'┘', border_color=None):
+        tline, bline = urwid.AttrMap(urwid.Divider(tline), border_color), urwid.AttrMap(urwid.Divider(bline), border_color)
+        lline, rline = urwid.AttrMap(urwid.SolidFill(lline), border_color), urwid.AttrMap(urwid.SolidFill(rline), border_color)
+        tlcorner, trcorner = urwid.AttrMap(urwid.Text(tlcorner), border_color), urwid.AttrMap(urwid.Text(trcorner), border_color)
+        blcorner, brcorner = urwid.AttrMap(urwid.Text(blcorner), border_color), urwid.AttrMap(urwid.Text(brcorner), border_color)
+        self.title_widget = urwid.AttrMap(urwid.Text(self.format_title(title)), border_color)
+        self.tline_widget = urwid.Columns([
+            tline,
+            ('flow', self.title_widget),
+            tline,
+        ])
+        top = urwid.Columns([
+            ('fixed', 1, tlcorner),
+            self.tline_widget,
+            ('fixed', 1, trcorner)
+        ])
+        middle = urwid.Columns([
+            ('fixed', 1, lline),
+            original_widget,
+            ('fixed', 1, rline),
+        ], box_columns=[0, 2], focus_column=1)
+        bottom = urwid.Columns([
+            ('fixed', 1, blcorner), bline, ('fixed', 1, brcorner)
+        ])
+        pile = urwid.Pile([('flow', top), middle, ('flow', bottom)], focus_item=1)
+        urwid.WidgetDecoration.__init__(self, original_widget)
+        urwid.WidgetWrap.__init__(self, pile)
 
-    #colors = ['light red', 'light magenta', 'dark magenta', 'brown', 'dark red', 'light magenta', 'yellow',
-    #        'dark gray', 'dark blue', 'light cyan', 'black', 'dark cyan', 'white', 'light gray', 'dark green']
-    #names = ['focused return label', 'doublestring', 'focus', 'var label', 'focused current frame name', 'current breakpoint focused source', 'title', 'focused frame location', 'source', 'focused current frame location', 'string', 'command line prompt', 'background', 'foot', 'search not found', 'fixed value', 'focused sidebar', 'breakpoint focused source', 'classname', 'name', 'frame class', 'button', 'focused current breakpoint', 'return value', 'flagged', 'current frame name', 'focused command line output', 'command line error', 'focused highlighted var label', 'label', 'highlighted var label', 'body', 'current highlighted source', 'focused current frame class', 'key', 'hotkey', 'command line input', 'selectable', 'command line focused button', 'focused highlighted var value', 'highlighted source', 'focused source', 'focused selectable', 'comment', 'search box', 'variables', 'odd row', 'header', 'line number', 'focused var value', 'command line clear button', 'frame name', 'flagged focus', 'frame location', 'literal', 'even row', 'focused command line error', 'head', 'focused frame class', 'focused return value', 'dirmark', 'flag', 'singlestring', 'current frame class', 'keyword', 'command line output', 'focused var label', 'breakpoint marker', 'value', 'focused frame name', 'error', 'dialog title', 'kw_namespace', 'warning', 'breakpoint source', 'variable separator', 'current focused source', 'punctuation', 'group head', 'var value', 'current breakpoint source', 'current frame location', 'current source', 'focused breakpoint', 'command line edit', 'docstring', 'current breakpoint', 'focused button', 'focused command line input', 'breakpoint', 'stack', 'highlighted var value', 'return label']
-    #def get_pair():
-    #    dark = choice([c for c in colors if 'dark' in c])
-    #    light = choice([c for c in colors if 'dark' not in c])
-    #    return dark, light
-    #palette = []
-    #for name in names:
-    #    palette.append((name,)+get_pair())
-    #return palette
-
-
-
-def next_in_pile(pile, size, key, loop):
-
-    item_rows = None
-    i = pile.focus_position
-    if pile._command_map[key] == 'j':
-        candidates = range(i-1, -1, -1)
-    else:
-        candidates = range(i+1, len(pile.contents))
-    if not item_rows:
-        item_rows = pile.get_item_rows(size, focus=True)
-    for j in candidates:
-        if not pile.contents[j][0].selectable():
-            continue
-        pile._update_pref_col_from_focus(size)   # ??
-        pile.focus_position = j
-        if not hasattr(pile.focus, 'move_cursor_to_coords'):
-            return
-        rows = item_rows[j]
-        if pile._command_map[key] == 'j':
-            rowlist = range(rows-1, -1, -1)
-        else:
-            rowlist = range(rows)
-        for row in rowlist:
-            tsize = pile.get_item_size(size, j, True, item_rows)
-            if pile.focus_item.move_cursor_to_coords(
-                    tsize, pile.pref_col, row):
-                break
-        return
-    return key
-
-
-class IPyTerminal(urwid.Terminal):
-
-    #def __init__(self, *args, **kwargs):
-    #    urwid.Terminal.__init__(self, *args, **kwargs)
-
-    def spawn(self):
-        self.master, slave_fd = pty.openpty()
-        self.pid = os.fork()
-        if self.pid == pty.CHILD:
-            os.setsid()
-            os.close(self.master)
-            os.dup2(slave_fd, pty.STDIN_FILENO)
-            os.dup2(slave_fd, pty.STDOUT_FILENO)
-            os.dup2(slave_fd, pty.STDERR_FILENO)
-            if (slave_fd > pty.STDERR_FILENO):
-                os.close (slave_fd)
-            tmp_fd = os.open(os.ttyname(pty.STDOUT_FILENO), os.O_RDWR)
-            os.close(tmp_fd)
-        else:
-            os.close(slave_fd)
-        if self.pid == 0:
-            try:
-                self.command()
-            except:
-                sys.stderr.write(traceback.format_exc())
-                sys.stderr.flush()
-        if self.main_loop is None:
-            fcntl.fcntl(self.master, fcntl.F_SETFL, os.O_NONBLOCK)
-        atexit.register(self.terminate)
-
-    #def keypress(self, size, key):
-    #    if key == 'ctrl b':
-    #        self.term.scroll_buffer(up=True, lines=self.height-1)
-    #    elif key == 'ctrl f':
-    #        self.term.scroll_buffer(up=False, lines=self.height-1)
-    #    return urwid.Terminal.keypress(self, size, key)
-
-    #def set_termsize(self, width, height):
-    #    return  # broken for me!
-
-    #def touch_term(self, width, height):
-    #    if not self.term:
-    #        self.term = urwid.TermCanvas(width, height, self)
-    #        no_resize = True
-    #    if self.pid is None:
-    #        self.spawn()
-    #        process_opened = True
-    #    no_resize = False
-    #    process_opened = False
-    #    if self.width == width and self.height == height:
-    #        return
-    #    self.set_termsize(width, height)
-    #    if no_resize:
-    #        self.term.resize(width, height)
-    #    self.width = width
-    #    self.height = height
-    #    if process_opened:
-    #        self.add_watch()
-
-    def touch_term(self, width, height):
-        if not self.term:
-            self.term = urwid.TermCanvas(width, height, self)
-        process_opened = False
-        if self.pid is None:
-            self.spawn()
-            process_opened = True
-        self.set_termsize(width, height)
-        if self.width == width and self.height == height:
-            return
-        else:
-            self.term.resize(width, height)
-        self.width = width
-        self.height = height
-        if process_opened:
-            self.add_watch()
 
 def make_grid(rows):
     """
@@ -247,22 +227,17 @@ class DialogBase(urwid.WidgetWrap):
 
         self.body = self.make_body(data)
 
-        self.frame = DialogFrame(self.body, focus_part = 'body', escape=self.on_negatory)
+        self.frame = DialogFrame(self.body, focus_part='body', escape=self.on_negatory)
         if header_text is not None:
-            self.frame.header = urwid.Pile( [urwid.Text(header_text),
+            self.frame.header = urwid.Pile( [urwid.AttrMap(urwid.Text(header_text), 'background'),
                 urwid.Divider(u'\u2550')] )
         w = self.frame
 
         # pad area around listbox
         w = urwid.Padding(w, ('fixed left',2), ('fixed right',2))
         w = urwid.Filler(w, ('fixed top',1), ('fixed bottom',1))
-        w = urwid.AttrMap(w, 'body')
-        w = urwid.LineBox(w)
-        # "shadow" effect
-        w = urwid.Columns( [w,('fixed', 1, urwid.AttrMap(
-            urwid.Filler(urwid.Text(('border',' ')), "top")
-            ,'shadow'))])
-        w = urwid.Frame( w, footer = urwid.AttrMap(urwid.Text(('border',' ')),'shadow'))
+        w = urwid.AttrMap(w, 'background')  # ?????
+        w = BorderedLineBox(w, border_color='border')
         self.loop = loop
         self.parent = self.loop.widget
         w = urwid.Overlay(w, self.parent, 'center', width+2, 'middle', height+2)
@@ -292,7 +267,7 @@ class DialogBase(urwid.WidgetWrap):
         for name, exitcode, callback in buttons:
             b = urwid.Button(name, callback, user_data=exitcode)
             b.exitcode = exitcode
-            b = urwid.AttrMap( b, 'button normal','button select' )
+            b = urwid.AttrMap( b, 'button', 'focusted button' )
             l.append( b )
         self.buttons = urwid.GridFlow(l, 10, 3, 1, 'center')
         self.frame.footer = urwid.Pile( [ urwid.Divider(u'\u2500'),
@@ -321,7 +296,7 @@ class YesNoDialog(DialogBase):
         DialogBase.__init__(self, *args, **kwargs)
 
     def make_body(self, data):
-        return urwid.Filler(urwid.Text(data))
+        return urwid.AttrMap(urwid.Filler(urwid.Text(data)), 'background')
 
     def callback(self, *args, **kwargs):
         return self.exitcode
@@ -341,25 +316,29 @@ class EditDialog(DialogBase):
         edit_text, editor_label = data
         self.edit = urwid.Edit(edit_text=edit_text)
         body = urwid.ListBox(urwid.SimpleListWalker([
-            urwid.AttrMap(urwid.Text(editor_label), 'reveal focus'),
-            urwid.AttrMap(self.edit, 'reveal focus'),
+            urwid.AttrMap(urwid.Text(editor_label), 'dialog title'),
+            urwid.AttrMap(self.edit, 'command line input'),
         ]))
         return body
     def callback(self):
         return self.edit.get_edit_text()
 
 class PynautTreeWidget(urwid.TreeWidget):
+    unexpanded_icon = urwid.AttrMap(urwid.TreeWidget.unexpanded_icon,
+        'tree row')
+    expanded_icon = urwid.AttrMap(urwid.TreeWidget.expanded_icon,
+        'tree row')
     leaf_container_icon = SelectableIcon(' ', 0)
 
     def __init__(self, node):
         self.__super.__init__(node)
         self._w = urwid.AttrMap(self._w, None)
         self.flagged = False
-        self.update_w()
         self.expanded = False
         self.flagged_nodes = set()
         self.update_expanded_icon()
         self.is_leaf = node.container_object.is_leaf
+        self.update_w()
 
     def selectable(self):
         return True
@@ -369,6 +348,7 @@ class PynautTreeWidget(urwid.TreeWidget):
         self.update_expanded_icon()
 
     def keypress(self, size, key):
+        self.update_w()
         self.update_expanded_icon()
         key = self.__super.keypress(size, key)
         if key in ('+', 'enter',):
@@ -379,21 +359,14 @@ class PynautTreeWidget(urwid.TreeWidget):
             self.update_expanded_icon()
         elif key in ('\\',):
             self.toggle()
-        else:
-            return key
-
-    def unhandled_keys(self, size, key):
-        if key == " ":
+        elif key == " ":
             self.flagged = not self.flagged
-            self.update_w()
             container_object = self.get_node().get_value()
             if self.flagged:
                 self.flagged_nodes.add(container_object)
-                logger.warn('adding {0} to list of flagged_nodes for {1}'.format(repr(container_object), repr(self)))
             else:
                 if container_object in self.flagged_nodes:
                     self.flagged_nodes.remove(container_object)
-                    logger.warn('removing {0} from list of flagged_nodes for {1}'.format(repr(container_object), repr(self)))
         else:
             return key
 
@@ -402,7 +375,7 @@ class PynautTreeWidget(urwid.TreeWidget):
             self._w.attr = 'flagged'
             self._w.focus_attr = 'flagged focus'
         else:
-            self._w.attr = 'body'
+            self._w.attr = 'tree row'
             self._w.focus_attr = 'focus'
 
     def load_inner_widget(self):
@@ -415,10 +388,6 @@ class PynautTreeWidget(urwid.TreeWidget):
         else:
             self._w.base_widget.widget_list[0] = [
                 self.unexpanded_icon, self.expanded_icon][self.expanded]
-
-
-
-
 
 class ContainerNode(urwid.ParentNode):
 
@@ -468,10 +437,12 @@ class ContainerNode(urwid.ParentNode):
             else:
                 color = 'even row'
             c += 1
-            name = urwid.AttrMap(urwid.Text(unicode(name)), color)
-            value = urwid.AttrMap(urwid.Text(unicode(value)), color)
+
+            name = urwid.AttrMap(urwid.Text(unicode(name)), 'var label')
+            value = urwid.AttrMap(urwid.Text(unicode(value)), 'var value')
             rows.append([height, name, value])
         body = make_grid(rows)
+        body = urwid.AttrMap(body, 'object descr box')
         return body
 
 
@@ -481,57 +452,22 @@ class ContainerTreeListBox(urwid.TreeListBox):
 
     def change_focus(self, *args, **kwargs):
         node = args[1]
-        if self.on_listbox_node_change is None:
-            logger.warn('on_listbox_node_change attribute still not set.')
-        else:
+        if self.on_listbox_node_change is not None:
             self.on_listbox_node_change(node)
         return urwid.TreeListBox.change_focus(self, *args, **kwargs)
 
 class PynautTreeBrowser:
-    #palette = [
-    #    ('body', 'black', 'light gray'),
-    #    ('dirmark', 'black', 'dark cyan', 'bold'),
-    #    ('error', 'dark red', 'light gray'),
-    #    ('even row', 'dark gray', 'light gray'),
-    #    ('flag', 'dark gray', 'light gray'),
-    #    ('flagged focus', 'yellow', 'dark cyan', ('bold','standout','underline')),
-    #    ('flagged', 'black', 'dark green', ('bold','underline')),
-    #    ('focus', 'light gray', 'dark blue', 'standout'),
-    #    ('foot', 'light gray', 'black'),
-    #    ('head', 'yellow', 'black', 'standout'),
-    #    ('key', 'light cyan', 'black','underline'),
-    #    ('odd row', 'light gray', 'dark gray'),
-    #    ('title', 'white', 'black', 'bold'),
-    #    ]
-
-
-    footer_text = [
+    palette = palette
+    terminal_header = [
         ('title', 'Pynaut Data Browser'), '    ',
-        ('key', 'UP'), ',', ('key', 'DOWN'), ',',
-        ('key', 'PAGE UP'), ',', ('key', 'PAGE DOWN'),
-        '  ',
-        ('key', '+'), ',',
-        ('key', '-'), '  ',
-        ('key', 'LEFT'), '  ',
-        ('key', 'HOME'), '  ',
-        ('key', 'END'), '  ',
-        ('key', 'Q'),
         ]
 
-
     def __init__(self, data=None):
-
         self.original_filters = []
         self.original_filters[:] = Container.filters
         self.grep_filter = None
         self.type_filter = None
-
         self.type_filter_states = OrderedDict()
-        ## format:
-        #self.type_filter_states = {
-        #    'Friendly Name': (SomeType, True),
-        #    # also...
-        #    'Friendly Name Two': ((SomeType1, SomeType2), True),
         builtin_types = set([t for t in vars(types).values() if t.__class__ is types.TypeType])  # FIXME
         builtin_types = OrderedDict(sorted([(x.__name__, (x, True)) for x in builtin_types]))
         self.type_filter_states.update(builtin_types)
@@ -541,35 +477,31 @@ class PynautTreeBrowser:
         self.container_tree_list_box = ContainerTreeListBox(urwid.TreeWalker(self.topnode))
         self.container_detail_box = urwid.WidgetPlaceholder(self.topnode.get_container_info_widget())
         self.container_tree_list_box.on_listbox_node_change = self.on_listbox_node_change
-
         self.columns = urwid.Columns(
             [
-                urwid.LineBox(self.container_tree_list_box),
-                (80, urwid.LineBox(self.container_detail_box)),
+                BorderedLineBox(self.container_tree_list_box, border_color='border'),
+                (80, BorderedLineBox(self.container_detail_box, border_color='border')),
              ])
         self.columns.set_focus_column(0)
-
-        self.footer = urwid.AttrMap(urwid.Text(self.footer_text), 'foot')
-
+        self.footer = urwid.AttrMap(urwid.Text(self.terminal_header), 'header')
         rows = [
             [2, urwid.Text('l'), urwid.Text('c'), urwid.Text('r') ],
         ]
         header = urwid.BoxAdapter(make_grid(rows), height = 2)
-        self.header = urwid.AttrMap(header, 'head')
-
-        self.main_ = urwid.Frame(urwid.AttrMap(self.columns, 'body'), header=self.header, footer=self.footer)
-
-        self.term = urwid.WidgetPlaceholder(urwid.Filler(urwid.Text('')))
-        self.term = urwid.AttrMap(self.term, 'terminal')
-        self.topmost = urwid.LineBox(
+        self.header = urwid.AttrMap(header, 'header')
+        self.main_ = urwid.Frame(urwid.AttrMap(self.columns, 'activity area'), header=self.header, footer=self.footer)
+        self.term = urwid.Terminal(command=self.embed, main_loop=LOOP)
+        self.topmost = BorderedLineBox(
             urwid.Pile([
                 ('weight', 1, self.main_),
-                (15, self.term),
+                (10, self.term),
             ], focus_item=1),
+            border_color='border',
         )
+        self.topmost = urwid.AttrMap(self.topmost, 'background')
 
-    def embed(self):
-        embed(header='', banner1='', banner2='')
+    def embed(self, *args, **kwargs):
+        embed()
 
     def on_filter_change(self):
         Container.filters[:] = self.original_filters
@@ -605,9 +537,16 @@ class PynautTreeBrowser:
         self.on_filter_change()
 
     def main(self):
+        global LOOP
         from urwid.curses_display import Screen as CursesScreen
-        self.loop = urwid.MainLoop(self.topmost, get_palette(), unhandled_input=self.unhandled_input, pop_ups=True, handle_mouse=False, screen=CursesScreen())
-        self.term.original_widget = IPyTerminal(self.embed, main_loop=self.loop)
+        self.loop = urwid.MainLoop(widget=self.topmost,
+                                   palette=self.palette,
+                                   screen=CursesScreen(),
+                                   handle_mouse=False,
+                                   input_filter=None,
+                                   unhandled_input=self.unhandled_input,
+                                   pop_ups=True,)
+        LOOP = self.loop
         self.loop.run()
 
     def quit(self):
@@ -620,14 +559,14 @@ class PynautTreeBrowser:
     def unhandled_input(self, k):
         if not isinstance(k, basestring):
             return k
-        if k.lower() == 'q':
+        if k == 'q':
             if not config['prompt_on_quit']:
                 self.quit()
             dialog = YesNoDialog(30, 10, data='Are you sure you want to quit?',
                             header_text='Quitting Application', loop=self.loop)
             urwid.connect_signal(dialog, 'commit', self.user_quit)
             dialog.show()
-        if k.lower() == 'f':
+        elif k == 'f':
             if self.attr_filter_reg is None:
                 edit_text = ''
             else:
@@ -637,18 +576,12 @@ class PynautTreeBrowser:
                            loop=self.loop)
             urwid.connect_signal(d, 'commit', self.set_container_tree_filter_regex)
             d.show()
-        if k.lower() == 't':
+        elif k == 't':
             d = AttrTypeDialog(50, 30, data=self.type_filter_states, header_text='Choose Attribute Types to Include', loop=self.loop)
             urwid.connect_signal(d, 'commit', self.set_attr_type_filters)
             d.show()
-        if k.lower() == 'j':
-            size = self.loop.screen.get_cols_rows()
-            pile = self.topmost.original_widget
-            next_in_pile(pile, size, key=k, loop=self.loop)
-        if k.lower() == 'k':
-            size = self.loop.screen.get_cols_rows()
-            pile = self.topmost.original_widget
-            next_in_pile(pile, size, key=k, loop=self.loop)
+        else:
+            pass
 
     def on_listbox_node_change(self, *args, **kwargs):
         node = args[0]
@@ -661,8 +594,3 @@ def _main(*args, **kwargs):
 
 def main():
     curses.wrapper(_main)
-
-browse = main
-
-if __name__ == '__main__':
-    main()
