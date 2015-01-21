@@ -41,7 +41,7 @@ setup(
     requires=['urwid', 'UniCurses'],
     entry_points={
         'console_scripts': [
-            '%s = %s.ui.curses:main' % (NAME, NAME),
+            '%s = %s.ui.main:main' % (NAME, NAME),
         ],
         'gui_script': []},
 )
