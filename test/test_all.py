@@ -19,9 +19,8 @@ def test_testdata():
     len(list(obj.grep_attr_names('^real$'))),
     len(list(obj.get_attr_matches(test))),
     ]
-    expected = [2, 0, 426, 1866]
-    print(results)
-    assert expected != results
+    expected = [2, 0, 489, 577]
+    assert expected == results
 
 def _test_repeated_search(obj, search_reg):
     obj = Container(obj)
