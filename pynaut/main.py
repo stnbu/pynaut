@@ -99,7 +99,7 @@ class Container(object):
             except Exception as e:
                 logger.warn('Having to return dummy value for attribute "{0}" (error: {1})'.format(name, str(e)))
                 _dict[name] = DUMMY_VALUE
-        for attr, value in _dict.iteritems():
+        for attr, value in _dict.items():
             child = self.get_from_cache(obj=value, parent=self)
             child.name = attr  # FIXME. Check name
             for filter in self.filters:
@@ -166,13 +166,13 @@ class Container(object):
         return self.obj in vars(builtins).values()
     @property
     def isbasetype(self):
-        return self.type in [t for t in vars(types).values() if isinstance(t, types.TypeType)]
+        return self.type in [t for t in vars(types).values() if isinstance(t, type)]
     @property
     def id(self):
         return id(self.obj)
     @property
     def isclass(self):
-        return isinstance(self.obj, (types.ClassType, types.TypeType))
+        return isinstance(self.obj, (types.ClassType, type))
     @property
     def doc(self):
         return self.obj.__doc__ or u''

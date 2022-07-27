@@ -473,7 +473,7 @@ class PynautTreeBrowser:
         self.grep_filter = None
         self.type_filter = None
         self.type_filter_states = OrderedDict()
-        builtin_types = set([t for t in vars(types).values() if t.__class__ is types.TypeType])  # FIXME
+        builtin_types = set([t for t in vars(types).values() if t.__class__ is type])  # FIXME
         builtin_types = OrderedDict(sorted([(x.__name__, (x, True)) for x in builtin_types]))
         self.type_filter_states.update(builtin_types)
         self.attr_filter_reg = None
